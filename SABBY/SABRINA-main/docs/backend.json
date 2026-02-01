@@ -1,0 +1,201 @@
+{
+  "entities": {
+    "User": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "User",
+      "type": "object",
+      "description": "Represents a user of the SportsCast platform.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the user entity."
+        },
+        "email": {
+          "type": "string",
+          "description": "Email address of the user.",
+          "format": "email"
+        },
+        "displayName": {
+          "type": "string",
+          "description": "The display name of the user."
+        },
+        "role": {
+          "type": "string",
+          "description": "Role of the user (e.g., 'regular', 'admin')."
+        }
+      },
+      "required": [
+        "id",
+        "email",
+        "displayName",
+        "role"
+      ]
+    },
+    "Video": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Video",
+      "type": "object",
+      "description": "Represents a sports video uploaded to the platform.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the video entity."
+        },
+        "title": {
+          "type": "string",
+          "description": "Title of the video."
+        },
+        "description": {
+          "type": "string",
+          "description": "Description of the video."
+        },
+        "sportType": {
+          "type": "string",
+          "description": "Type of sport featured in the video (e.g., 'football', 'basketball')."
+        },
+        "uploaderId": {
+          "type": "string",
+          "description": "Reference to User. (Relationship: User 1:N Video). ID of the user who uploaded the video."
+        },
+        "uploadDate": {
+          "type": "string",
+          "description": "Date and time when the video was uploaded.",
+          "format": "date-time"
+        },
+        "thumbnailURL": {
+          "type": "string",
+          "description": "URL of the video thumbnail."
+        },
+        "videoURL": {
+          "type": "string",
+          "description": "URL of the actual video file.",
+          "format": "uri"
+        },
+        "likes": {
+          "type": "number",
+          "description": "Number of likes the video has received."
+        },
+        "views": {
+          "type": "number",
+          "description": "Number of times the video has been viewed."
+        },
+        "categoryIds": {
+          "type": "array",
+          "description": "References to Categories. (Relationship: Category N:N Video)",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "description",
+        "sportType",
+        "uploaderId",
+        "uploadDate",
+        "thumbnailURL",
+        "videoURL"
+      ]
+    },
+    "Category": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Category",
+      "type": "object",
+      "description": "Represents a category of sports videos (e.g., Football, Basketball).",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the category entity."
+        },
+        "name": {
+          "type": "string",
+          "description": "Name of the category (e.g., 'Football')."
+        }
+      },
+      "required": [
+        "id",
+        "name"
+      ]
+    }
+  },
+  "auth": {
+    "providers": [
+      "password",
+      "anonymous"
+    ]
+  },
+  "firestore": {
+    "structure": [
+      {
+        "path": "/users/{userId}",
+        "definition": {
+          "entityName": "User",
+          "schema": {
+            "$ref": "#/backend/entities/User"
+          },
+          "description": "Stores user profile data.  Used for user management and authentication.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier of the user."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/videos/{videoId}",
+        "definition": {
+          "entityName": "Video",
+          "schema": {
+            "$ref": "#/backend/entities/Video"
+          },
+          "description": "Stores metadata for all videos uploaded to the platform. Includes denormalized 'uploaderId' for authorization independence, and 'categoryIds' to permit filtering and list operations.",
+          "params": [
+            {
+              "name": "videoId",
+              "description": "The unique identifier of the video."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/categories/{categoryId}",
+        "definition": {
+          "entityName": "Category",
+          "schema": {
+            "$ref": "#/backend/entities/Category"
+          },
+          "description": "Stores categories for videos (e.g., Football, Basketball).",
+          "params": [
+            {
+              "name": "categoryId",
+              "description": "The unique identifier of the category."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/videos/{videoId}",
+        "definition": {
+          "entityName": "Video",
+          "schema": {
+            "$ref": "#/backend/entities/Video"
+          },
+          "description": "Subcollection within each user document to store video metadata specific to that user. Enables path-based ownership for security rules. This duplicates data in /videos/{videoId} for security.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier of the user."
+            },
+            {
+              "name": "videoId",
+              "description": "The unique identifier of the video."
+            }
+          ]
+        }
+      }
+    ],
+    "reasoning": "The Firestore structure is designed to support a sports video streaming platform with user authentication, video uploads, and public access. It emphasizes security, scalability, and debuggability by adhering to Authorization Independence and Structural Segregation principles.\n\n*   **Authorization Independence:** The `videos` collection includes the `uploaderId` field, which is denormalized authorization data, eliminating the need for `get()` calls in security rules to verify ownership. The `categoryIds` array is also denormalized, allowing videos to be easily queried by category without complex joins.\n*   **Structural Segregation:** Videos are stored in a single `videos` collection, with metadata, simplifying security rules and queries.\n*   **Access Modeling:** Users have path-based ownership of their video metadata (`/users/{userId}/videos/{videoId}`). This ownership is enforced in Firestore rules, ensuring that only the video owner can modify or delete their video's metadata. Public videos are accessible to everyone through list operations on the `/videos` collection.\n*   **QAPs:** The structure supports secure `list` operations on both `/videos` (for public access) and `/users/{userId}/videos` (for user-specific access). Segregation ensures that only the necessary data is exposed in each case, preventing unauthorized access."
+  }
+}

@@ -1,0 +1,169 @@
+/**
+ * This Firestore Security Ruleset is designed for the SportsCast platform.
+ *
+ * Core Philosophy:
+ * This ruleset implements a hybrid security model. It enforces strict user-ownership for all user-specific data,
+ * ensuring that a user's profile and private data tree are accessible only to them. For globally shared content,
+ * like videos, it employs a "Public Read, Owner-Only Write" model, allowing public consumption while restricting
+ * modifications to the original creator.
+ *
+ * Data Structure:
+ * The data is organized into three top-level collections: /users, /videos, and /categories.
+ * - /users/{userId}: Contains private user profile information.
+ * - /users/{userId}/videos/{videoId}: A denormalized subcollection containing a user's own video metadata,
+ *   enabling simple, path-based security checks for ownership.
+ * - /videos/{videoId}: A global, public collection of all videos for easy discovery and viewing.
+ * - /categories/{categoryId}: A public, read-only collection for video categories.
+ *
+ * Key Security Decisions:
+ * 1. User Privacy: User data is strictly private. Users cannot read other users' profiles, and user listing is disabled.
+ * 2. Content Ownership: The `uploaderId` field on each video document is the source of truth for write permissions
+ *    on the public `/videos` collection, preventing costly rule lookups.
+ * 3. Read-Only Lookups: The `/categories` collection is publicly readable but cannot be modified by clients, ensuring
+ *    data integrity. It is intended to be managed by administrators through the Firebase Console or a trusted server environment.
+ * 4. Default Secure: Any operation not explicitly granted is denied. Write operations are never left open.
+ *
+ * Denormalization for Authorization:
+ * - The `uploaderId` is denormalized onto every document in `/videos`, making ownership checks fast and simple.
+ * - The `/users/{userId}/videos` subcollection path is a form of denormalization, using the path itself as a
+ *   key for ownership-based authorization.
+ *
+ * Structural Segregation:
+ * The dual video collections (`/videos` and `/users/{userId}/videos`) provide a clear separation between public-facing
+ * data for querying and private, user-owned data for management, simplifying security logic for both.
+ */
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper Functions for Reusability and Readability
+
+    /**
+     * Checks if a user is authenticated.
+     */
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    /**
+     * Checks if the currently authenticated user's UID matches the provided userId.
+     * This is the primary function for establishing document ownership.
+     */
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    /**
+     * A robust check for update/delete operations, ensuring the user is the owner
+     * AND the document they are trying to modify actually exists.
+     */
+    function isExistingOwner(userId) {
+      return isOwner(userId) && resource != null;
+    }
+
+    /**
+     * Checks if the currently authenticated user is the uploader of a given document.
+     * This relies on a denormalized 'uploaderId' field on the document itself.
+     */
+    function isUploader(doc) {
+      return isSignedIn() && doc.uploaderId == request.auth.uid;
+    }
+
+    /**
+     * A robust check for update/delete on a public document, verifying existence
+     * and ownership via the 'uploaderId' field.
+     */
+    function isExistingUploader() {
+      return resource != null && isUploader(resource.data);
+    }
+
+    /**
+     * Validates that the user's `id` field matches their UID on creation.
+     */
+    function isConsistentUser_Create(userId) {
+      return request.resource.data.id == userId;
+    }
+
+    /**
+     * Validates that critical user fields (like `id` and `role`) are immutable on update.
+     */
+    function isConsistentUser_Update() {
+      return request.resource.data.id == resource.data.id && request.resource.data.role == resource.data.role;
+    }
+
+    /**
+     * Validates that the 'uploaderId' field is immutable on video document updates.
+     */
+    function isUploaderIdImmutable() {
+      return request.resource.data.uploaderId == resource.data.uploaderId;
+    }
+
+    /**
+     * Validates the uploaderId is correctly set on video creation.
+     */
+    function hasCorrectUploaderId(expectedUploaderId) {
+      return request.resource.data.uploaderId == expectedUploaderId;
+    }
+
+
+    /**
+     * @description Rules for the user's own profile document.
+     * @path /users/{userId}
+     * @allow A logged-in user (auth.uid: 'user123') can (create) their own user document at /users/user123.
+     * @deny A logged-in user (auth.uid: 'user123') cannot (get) another user's document at /users/user456.
+     * @principle Restricts access to a user's own data tree and prevents user enumeration.
+     */
+    match /users/{userId} {
+      allow get: if isOwner(userId);
+      allow list: if false;
+      allow create: if isOwner(userId) && isConsistentUser_Create(userId);
+      allow update: if isExistingOwner(userId) && isConsistentUser_Update();
+      allow delete: if isExistingOwner(userId);
+
+      /**
+       * @description Rules for the private subcollection of videos owned by a user.
+       * @path /users/{userId}/videos/{videoId}
+       * @allow A logged-in user (auth.uid: 'user123') can (create) a video document in their own subcollection at /users/user123/videos/videoABC.
+       * @deny A logged-in user (auth.uid: 'user123') cannot (list) videos in another user's subcollection at /users/user456/videos.
+       * @principle Enforces strict, path-based ownership for all operations on a user's private data.
+       */
+      match /videos/{videoId} {
+        allow get: if isOwner(userId);
+        allow list: if isOwner(userId);
+        allow create: if isOwner(userId) && hasCorrectUploaderId(userId);
+        allow update: if isExistingOwner(userId) && isUploaderIdImmutable();
+        allow delete: if isExistingOwner(userId);
+      }
+    }
+
+    /**
+     * @description Rules for the public-facing collection of all videos.
+     * @path /videos/{videoId}
+     * @allow Any user, signed-in or not, can (get) or (list) all videos in this collection.
+     * @deny A user (auth.uid: 'user123') cannot (update) a video where the existing 'uploaderId' is 'user456'.
+     * @principle Implements a "Public Read, Owner-Only Write" model, relying on a denormalized `uploaderId` field for performant and secure write authorization.
+     */
+    match /videos/{videoId} {
+      allow get: if true;
+      allow list: if true;
+      allow create: if isUploader(request.resource.data);
+      allow update: if isExistingUploader() && isUploaderIdImmutable();
+      allow delete: if isExistingUploader();
+    }
+
+    /**
+     * @description Rules for the public, read-only collection of video categories.
+     * @path /categories/{categoryId}
+     * @allow Any user, signed-in or not, can (get) or (list) all categories.
+     * @deny Any user, even an admin from the client, cannot (create), (update), or (delete) a category.
+     * @principle Secures lookup data by making it read-only for clients. This data should be managed via the Firebase Console or a trusted backend environment.
+     */
+    match /categories/{categoryId} {
+      allow get: if true;
+      allow list: if true;
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
+    }
+  }
+}

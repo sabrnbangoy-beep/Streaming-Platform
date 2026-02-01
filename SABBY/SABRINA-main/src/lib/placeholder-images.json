@@ -1,0 +1,34 @@
+{
+  "placeholderImages": [
+    {
+      "id": "basketball-dunk",
+      "description": "A basketball player dunking",
+      "imageUrl": "https://images.unsplash.com/photo-1728941803861-fbd61eaa2b3e?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwyfHxiYXNrZXRiYWxsJTIwZHVua3xlbnwwfHx8fDE3Njk5NTk3MjB8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "basketball dunk"
+    },
+    {
+      "id": "soccer-goal",
+      "description": "A soccer player scoring a goal",
+      "imageUrl": "https://images.unsplash.com/photo-1428200698796-38743f953a43?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw2fHxzb2NjZXIlMjBnb2FsfGVufDB8fHx8MTc2OTkwOTU3NHww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "soccer goal"
+    },
+    {
+      "id": "f1-race",
+      "description": "Formula 1 cars racing on a track",
+      "imageUrl": "https://images.unsplash.com/photo-1543796076-c8a565501995?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw2fHxyYWNlJTIwY2FyfGVufDB8fHx8MTc2OTg3MTM0N3ww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "race car"
+    },
+    {
+      "id": "gaming-esports",
+      "description": "An esports gaming tournament",
+      "imageUrl": "https://images.unsplash.com/photo-1635372708431-64774de60e20?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwyfHxlc3BvcnRzJTIwZ2FtaW5nfGVufDB8fHx8MTc2OTkzODAwMnww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "esports gaming"
+    },
+    {
+      "id": "generic-sports",
+      "description": "A generic sports stadium",
+      "imageUrl": "https://images.unsplash.com/photo-1590372447928-33080a2b401a?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwyfHxzcG9ydHMlMjBzdGFkaXVtfGVufDB8fHx8MTc2OTg0OTgyMXww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "sports stadium"
+    }
+  ]
+}
